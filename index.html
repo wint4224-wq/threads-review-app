@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-threads'; style-src 'unsafe-inline'; connect-src https://api.github.com; img-src 'self' data:; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>스레드 초안함</title>
+<meta name="description" content="블로그 새 글로 만든 스레드 초안을 검토하고 게시합니다">
+<meta name="theme-color" content="#f4f4f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121314" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="스레드 초안함">
+<style>
+:root{
+  --bg:#f4f4f1; --surface:#ffffff; --surface2:#ebebe6; --text:#1c1d1f; --muted:#65676b;
+  --line:#dcdcd6; --accent:#2b4fd8; --accent-text:#ffffff; --accent-soft:#e2e8fc;
+  --danger:#b3261e; --danger-soft:#fbe4e1; --ok:#1c7a4e; --ok-soft:#dff2e8; --warn-soft:#fbf0d3;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#121314; --surface:#1b1d1f; --surface2:#26292c; --text:#ececea; --muted:#a2a5aa;
+    --line:#33373b; --accent:#8fa8ff; --accent-text:#10162c; --accent-soft:#232d50;
+    --danger:#ff8f86; --danger-soft:#3b2120; --ok:#74d3a4; --ok-soft:#1b3328; --warn-soft:#3a3118;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;overflow-wrap:anywhere;word-break:keep-all;overflow-x:hidden;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none !important}
+h1,h2,p{margin:0}
+button,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+a{color:var(--accent)}
+
+.top{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top)}
+.bar{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:8px;padding:8px 16px;min-height:56px}
+.brand{font-size:1.15rem;font-weight:700;flex:1;min-width:0}
+.icon-btn{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-size:1.15rem;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.icon-btn.spin span{display:inline-block;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.tabs{max-width:760px;margin:0 auto;display:flex;gap:4px;padding:0 16px}
+.tabs button{flex:0 0 auto;min-height:44px;padding:0 14px;border:0;background:none;cursor:pointer;color:var(--muted);font-weight:600;border-bottom:3px solid transparent}
+.tabs button[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent)}
+
+main{max-width:760px;margin:0 auto;padding:16px 16px calc(40px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
+.stack > * + *{margin-top:12px}
+.h{font-size:1.05rem;font-weight:700}
+.sub,.hint{color:var(--muted);font-size:.88rem}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.grow{flex:1 1 auto}
+.btn{min-height:48px;padding:10px 18px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);cursor:pointer;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-text)}
+.btn.danger{color:var(--danger);background:transparent;border-color:var(--danger)}
+.btn.ghost{background:transparent}
+.btn.small{min-height:44px;padding:6px 12px;font-size:.9rem}
+.btn.wide{width:100%}
+.btn:disabled{opacity:.55;cursor:default}
+
+.msg{border-radius:12px;padding:10px 14px;font-size:.95rem}
+.msg:empty{display:none}
+.msg.ok{background:var(--ok-soft)}
+.msg.err{background:var(--danger-soft);color:var(--danger)}
+.msg.info{background:var(--surface2)}
+.msg.warn{background:var(--warn-soft)}
+
+.draft-head{display:block;width:100%;text-align:left;border:0;background:none;padding:0;cursor:pointer}
+.draft-title{font-weight:700;margin-top:4px}
+.preview{color:var(--muted);font-size:.92rem;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-line}
+.meta{color:var(--muted);font-size:.84rem;display:flex;flex-wrap:wrap;gap:2px 10px;align-items:center}
+.badge{display:inline-flex;align-items:center;padding:1px 10px;border-radius:999px;background:var(--surface2);color:var(--muted);font-size:.8rem;font-weight:700}
+.badge.pending{background:var(--accent-soft);color:var(--text)}
+.badge.queued,.badge.publishing{background:var(--warn-soft);color:var(--text)}
+.badge.published{background:var(--ok-soft);color:var(--ok)}
+.badge.failed{background:var(--danger-soft);color:var(--danger)}
+
+.part{border-top:1px solid var(--line);padding-top:12px}
+.part-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.part-label{font-weight:700;font-size:.92rem;flex:1}
+.count{font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.count.over{color:var(--danger);font-weight:700}
+label.lbl{display:block;font-weight:600;margin-bottom:6px}
+input[type=text],input[type=password],textarea{width:100%;max-width:100%;border:1px solid var(--line);border-radius:12px;background:var(--bg);padding:12px 14px;font-size:1rem;min-height:48px}
+textarea{min-height:150px;resize:vertical;line-height:1.65}
+textarea:disabled,input:disabled{opacity:.7}
+.choice{display:flex;gap:8px;flex-wrap:wrap}
+.choice label{flex:1 1 150px;min-height:48px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;gap:8px;align-items:center;cursor:pointer;font-size:.95rem}
+.choice label:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.choice input{accent-color:var(--accent);width:18px;height:18px;flex:none}
+.empty{color:var(--muted);text-align:center;padding:32px 8px}
+.steps{margin:0;padding-left:1.2em;color:var(--muted);font-size:.92rem}
+.field + .field{margin-top:14px}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="bar">
+    <h1 class="brand">스레드 초안함</h1>
+    <div class="row" id="topActions" hidden>
+      <button class="icon-btn" id="refreshBtn" data-act="refresh" aria-label="새로고침"><span aria-hidden="true">↻</span></button>
+      <button class="icon-btn" data-act="open-setup" aria-label="설정"><span aria-hidden="true">⚙</span></button>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs" role="tablist" aria-label="초안 구분" hidden>
+    <button role="tab" id="t-review" data-tab="review">검토 <span id="reviewCount"></span></button>
+    <button role="tab" id="t-done" data-tab="done">완료 <span id="doneCount"></span></button>
+  </nav>
+</header>
+
+<main id="main">
+  <section id="setup" hidden>
+    <form class="card stack" id="setupForm" autocomplete="off" novalidate>
+      <h2 class="h">GitHub 연결</h2>
+      <p class="sub">입력한 값은 이 기기의 브라우저에만 저장되고 GitHub API에만 사용합니다.</p>
+      <div>
+        <div class="field">
+          <label class="lbl" for="ownerInput">GitHub 아이디</label>
+          <input type="text" id="ownerInput" autocapitalize="off" spellcheck="false">
+        </div>
+        <div class="field">
+          <label class="lbl" for="repoInput">저장소 이름</label>
+          <input type="text" id="repoInput" autocapitalize="off" spellcheck="false" value="threads-data">
+        </div>
+        <div class="field">
+          <label class="lbl" for="tokenInput">Fine-grained 토큰</label>
+          <input type="password" id="tokenInput" autocapitalize="off" spellcheck="false" autocomplete="new-password" placeholder="github_pat_...">
+          <p class="hint">threads-data 저장소 하나만 선택하고, 권한은 Contents와 Actions를 Read and write로 설정합니다.</p>
+        </div>
+      </div>
+      <p class="msg" id="setupMsg" role="status" aria-live="polite"></p>
+      <div class="row">
+        <button type="submit" class="btn primary grow" id="setupSave">연결 확인 후 저장</button>
+        <button type="button" class="btn ghost" id="setupClose" data-act="close-setup" hidden>닫기</button>
+      </div>
+      <button type="button" class="btn danger wide" id="clearSetup" data-act="clear-setup" hidden>이 기기에서 설정 지우기</button>
+    </form>
+  </section>
+
+  <section id="board" class="stack" hidden>
+    <p class="msg" id="tokenNotice" role="status"></p>
+    <p class="msg" id="boardMsg" role="status" aria-live="polite"></p>
+    <div id="list" class="stack"></div>
+  </section>
+</main>
+
+<script nonce="threads">
+(function(){
+'use strict';
+
+const $ = (s) => document.querySelector(s);
+const API = 'https://api.github.com';
+const KEY = 'threads-review.cfg';
+const MAX = 500, MAX_PARTS = 5, POLL_MS = 15000, POLL_LIMIT = 24;
+const LABEL = { pending:'검토 대기', queued:'게시 대기', publishing:'게시 중', published:'게시 완료', failed:'게시 실패', dismissed:'버림' };
+const REVIEW = new Set(['pending','queued','publishing','failed']);
+const LOCKED = new Set(['queued','publishing','published','dismissed']);
+
+function lsGet(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+function lsDel(k){ try{ localStorage.removeItem(k); }catch(e){} }
+
+// innerHTML에 들어가는 모든 데이터는 이 함수를 거친다
+function esc(v){ return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function safeUrl(u){ return /^https:\/\//i.test(String(u || '')) ? String(u) : ''; }
+
+// 공식 문서 기준으로 이모지는 UTF-8 바이트 수로 센다 (서버 검사와 같은 규칙)
+const enc = new TextEncoder();
+function threadLen(s){
+  let n = 0;
+  for(const ch of String(s)){
+    const c = ch.codePointAt(0);
+    n += ((c >= 0x2190 && c <= 0x2BFF) || (c >= 0x1F000 && c <= 0x1FAFF) || c === 0xFE0F || c === 0x200D) ? enc.encode(ch).length : 1;
+  }
+  return n;
+}
+
+const S = { cfg:null, tab:'review', drafts:new Map(), edits:new Map(), open:null, token:null, loading:false, busy:new Set(), notes:new Map(), pollCount:0, pollTimer:null };
+
+function validCfg(c){ return c && c.owner && c.repo && c.token; }
+function repoPath(c){ c = c || S.cfg; return '/repos/' + encodeURIComponent(c.owner) + '/' + encodeURIComponent(c.repo); }
+
+async function gh(path, opt){
+  opt = opt || {};
+  const c = opt.cfg || S.cfg;
+  const headers = { 'Authorization':'Bearer ' + c.token, 'X-GitHub-Api-Version':'2022-11-28', 'Accept': opt.raw ? 'application/vnd.github.raw' : 'application/vnd.github+json' };
+  const init = { method: opt.method || 'GET', headers, cache:'no-store' };
+  if(opt.body !== undefined){ headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(opt.body); }
+  try{ return await fetch(API + path, init); }
+  catch(e){ throw new Error('GitHub에 연결할 수 없어요. 인터넷 연결을 확인해 주세요.'); }
+}
+async function errText(res){
+  let detail = '';
+  try{ const j = await res.json(); detail = j && j.message ? String(j.message) : ''; }catch(e){}
+  const base = ({ 401:'토큰이 올바르지 않거나 만료됐어요. 설정에서 토큰을 확인해 주세요.', 403:'권한이 부족하거나 요청 한도를 넘었어요.', 404:'저장소나 파일을 찾을 수 없어요.', 409:'다른 곳에서 먼저 바뀌었어요. 새로고침 후 다시 시도해 주세요.', 422:'GitHub가 요청을 받아들이지 않았어요.' })[res.status] || 'GitHub 요청이 실패했어요.';
+  return base + ' (HTTP ' + res.status + (detail ? ', ' + detail : '') + ')';
+}
+function toB64(str){
+  const bytes = enc.encode(str);
+  let bin = '';
+  for(let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+function setMsg(id, text, kind){ const el = $(id); el.textContent = text || ''; el.className = 'msg ' + (kind || ''); }
+function fmtDate(v){
+  const d = new Date(v);
+  if(!v || isNaN(d)) return '';
+  const p = n => String(n).padStart(2,'0');
+  return (d.getMonth()+1) + '/' + d.getDate() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+
+/* ---------- 데이터 ---------- */
+function normalize(o, name, sha){
+  const s = v => typeof v === 'string' ? v : '';
+  return {
+    raw:o, name, sha, id:s(o.id) || name.replace(/\.json$/,''), blog_name:s(o.blog_name) || s(o.blog), post_title:s(o.post_title),
+    post_url:s(o.post_url), published_at:s(o.published_at), body_source:s(o.body_source), status: LABEL[o.status] ? o.status : 'pending',
+    parts:Array.isArray(o.parts) ? o.parts.map(s) : [], link_text:s(o.link_text), link_placement:o.link_placement === 'body' ? 'body' : 'reply',
+    published_ids:Array.isArray(o.published_ids) ? o.published_ids : [], permalink:s(o.permalink), error:s(o.error), updated_at:s(o.updated_at),
+  };
+}
+async function loadFile(f){
+  const res = await gh(repoPath() + '/contents/drafts/' + encodeURIComponent(f.name), { raw:true });
+  if(!res.ok) throw new Error(await errText(res));
+  return normalize(JSON.parse(await res.text()), f.name, f.sha);
+}
+async function pool(items, fn, size){
+  const out = []; let i = 0;
+  await Promise.all(Array.from({length:Math.min(size, items.length)}, async () => { while(i < items.length){ const k = i++; out[k] = await fn(items[k]); } }));
+  return out;
+}
+async function loadDrafts(){
+  const res = await gh(repoPath() + '/contents/drafts');
+  if(res.status === 404){ S.drafts = new Map(); return; }
+  if(!res.ok) throw new Error(await errText(res));
+  const files = (await res.json()).filter(f => f && f.type === 'file' && /\.json$/.test(f.name));
+  const byName = new Map([...S.drafts.values()].map(d => [d.name, d]));
+  const loaded = await pool(files, f => { const old = byName.get(f.name); return old && old.sha === f.sha ? old : loadFile(f); }, 6);
+  S.drafts = new Map(loaded.map(d => [d.id, d]));
+}
+async function loadToken(){
+  const res = await gh(repoPath() + '/contents/data/token-status.json', { raw:true });
+  if(!res.ok){ S.token = null; return; }
+  try{ S.token = JSON.parse(await res.text()); }catch(e){ S.token = null; }
+}
+async function loadAll(quiet){
+  if(S.loading) return;
+  S.loading = true;
+  $('#refreshBtn').classList.add('spin');
+  try{
+    await Promise.all([loadDrafts(), loadToken()]);
+    if(!quiet) setMsg('#boardMsg', '');
+  }catch(e){ setMsg('#boardMsg', e.message, 'err'); }
+  S.loading = false;
+  $('#refreshBtn').classList.remove('spin');
+  render();
+  schedulePoll();
+}
+function schedulePoll(){
+  clearTimeout(S.pollTimer);
+  const active = [...S.drafts.values()].some(d => d.status === 'queued' || d.status === 'publishing');
+  if(!active){ S.pollCount = 0; return; }
+  if(S.pollCount >= POLL_LIMIT) return;
+  S.pollCount++;
+  S.pollTimer = setTimeout(() => loadAll(true), POLL_MS);
+}
+function editOf(d){
+  let e = S.edits.get(d.id);
+  if(!e){ e = { parts:d.parts.slice(), link_text:d.link_text, link_placement:d.link_placement, dirty:false }; S.edits.set(d.id, e); }
+  return e;
+}
+function isEditable(d){ return !LOCKED.has(d.status) && d.published_ids.length === 0; }
+
+async function putDraft(d, changes){
+  const next = Object.assign({}, d.raw, changes, { updated_at:new Date().toISOString() });
+  const res = await gh(repoPath() + '/contents/drafts/' + encodeURIComponent(d.name), { method:'PUT', body:{
+    message:'review: ' + d.id + ' ' + next.status,
+    content:toB64(JSON.stringify(next, null, 2) + '\n'),
+    sha:d.sha,
+  }});
+  if(!res.ok) throw new Error(await errText(res));
+  const j = await res.json();
+  const updated = normalize(next, d.name, j.content.sha);
+  S.drafts.set(d.id, updated);
+  return updated;
+}
+function editedFields(d){
+  if(!isEditable(d)) return {};
+  const e = editOf(d);
+  return { parts:e.parts.map(p => p.trim()), link_text:e.link_text.trim(), link_placement:e.link_placement };
+}
+function problems(d){
+  if(!isEditable(d)) return [];
+  const e = editOf(d), out = [];
+  if(!e.parts.length) out.push('글이 하나도 없어요.');
+  e.parts.forEach((p,i) => {
+    if(!p.trim()) out.push((i+1) + '번째 글이 비어 있어요.');
+    if(threadLen(p.trim()) > MAX) out.push((i+1) + '번째 글이 ' + MAX + '자를 넘어요.');
+  });
+  if(e.link_placement === 'reply' && !e.link_text.trim()) out.push('링크 문구가 비어 있어요.');
+  if(threadLen(e.link_text.trim()) > MAX) out.push('링크 문구가 ' + MAX + '자를 넘어요.');
+  return out;
+}
+async function dispatchPublish(){
+  const res = await gh(repoPath() + '/actions/workflows/threads.yml/dispatches', { method:'POST', body:{ ref:'main', inputs:{ mode:'publish' } } });
+  if(res.status !== 204) throw new Error(await errText(res));
+}
+
+/* ---------- 화면 ---------- */
+function render(){
+  const all = [...S.drafts.values()].sort((a,b) => (b.published_at || '').localeCompare(a.published_at || ''));
+  const review = all.filter(d => REVIEW.has(d.status)), done = all.filter(d => !REVIEW.has(d.status));
+  $('#reviewCount').textContent = review.length ? '(' + review.length + ')' : '';
+  $('#doneCount').textContent = done.length ? '(' + done.length + ')' : '';
+  $('#t-review').setAttribute('aria-selected', String(S.tab === 'review'));
+  $('#t-done').setAttribute('aria-selected', String(S.tab === 'done'));
+  renderToken();
+  const items = S.tab === 'review' ? review : done;
+  $('#list').innerHTML = items.length ? items.map(cardHTML).join('') : '<div class="card empty">' + (S.tab === 'review' ? '검토할 초안이 없어요. 새 글이 올라오면 하루 세 번 확인해서 여기에 쌓입니다.' : '완료된 초안이 없어요.') + '</div>';
+}
+function renderToken(){
+  const t = S.token;
+  if(!t){ setMsg('#tokenNotice', ''); return; }
+  if(t.error){ setMsg('#tokenNotice', '스레드 토큰 문제: ' + t.error, 'err'); return; }
+  const days = Math.ceil((new Date(t.expires_at) - Date.now()) / 86400000);
+  if(isNaN(days) || days > 14){ setMsg('#tokenNotice', ''); return; }
+  setMsg('#tokenNotice', days > 0 ? '스레드 토큰이 ' + days + '일 뒤 만료돼요. 자동 갱신을 확인해 주세요.' : '스레드 토큰이 만료됐어요. 새로 발급해 등록해 주세요.', days > 0 ? 'warn' : 'err');
+}
+function cardHTML(d){
+  const open = S.open === d.id;
+  const first = (S.edits.get(d.id) || d).parts[0] || '';
+  const url = safeUrl(d.post_url);
+  return '<article class="card stack" data-id="' + esc(d.id) + '">'
+    + '<button type="button" class="draft-head" data-act="toggle" aria-expanded="' + open + '">'
+    +   '<span class="meta"><span class="badge ' + esc(d.status) + '">' + esc(LABEL[d.status]) + '</span><span>' + esc(d.blog_name) + '</span><span>' + esc(fmtDate(d.published_at)) + '</span></span>'
+    +   '<div class="draft-title">' + esc(d.post_title) + '</div>'
+    +   (open ? '' : '<div class="preview">' + esc(first) + '</div>')
+    + '</button>'
+    + (url ? '<a class="sub" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">블로그 원문 보기</a>' : '')
+    + (d.error ? '<p class="msg err">' + esc(d.error) + '</p>' : '')
+    + (d.body_source === 'summary' ? '<p class="msg warn">본문을 읽지 못해 RSS 요약으로 쓴 초안이에요. 내용을 꼭 확인해 주세요.</p>' : '')
+    + (open ? editorHTML(d) : '')
+    + '</article>';
+}
+function countHTML(text){ const n = threadLen(text); return '<span class="count' + (n > MAX ? ' over' : '') + '">' + n + ' / ' + MAX + '</span>'; }
+function editorHTML(d){
+  const e = editOf(d), can = isEditable(d), off = can ? '' : ' disabled', busy = S.busy.has(d.id);
+  const parts = e.parts.map((p,i) => '<div class="part">'
+    + '<div class="part-top"><span class="part-label">' + (i === 0 ? '첫 게시물' : (i+1) + '번째 (댓글로 이어짐)') + '</span>' + countHTML(p)
+    + (can && e.parts.length > 1 ? '<button type="button" class="btn small ghost" data-act="remove-part" data-i="' + i + '" aria-label="' + (i+1) + '번째 글 삭제">삭제</button>' : '')
+    + '</div><textarea data-field="part" data-i="' + i + '" aria-label="' + (i+1) + '번째 글"' + off + '>' + esc(p) + '</textarea></div>').join('');
+  const radio = (v,t) => '<label><input type="radio" name="link-' + esc(d.id) + '" value="' + v + '" data-field="placement"' + (e.link_placement === v ? ' checked' : '') + off + '>' + t + '</label>';
+  const note = S.notes.get(d.id);
+  let actions = '';
+  if(d.status === 'pending' || d.status === 'failed'){
+    const resume = d.published_ids.length > 0;
+    actions = '<div class="row">'
+      + (can ? '<button type="button" class="btn" data-act="save"' + (busy ? ' disabled' : '') + '>저장</button>' : '')
+      + '<button type="button" class="btn primary grow" data-act="publish"' + (busy ? ' disabled' : '') + '>' + (resume ? '이어서 게시' : (d.status === 'failed' ? '다시 게시' : '스레드에 게시')) + '</button>'
+      + '</div>' + (resume ? '' : '<button type="button" class="btn ghost wide" data-act="dismiss"' + (busy ? ' disabled' : '') + '>이 초안 버리기</button>');
+  } else if(d.status === 'queued'){
+    actions = '<p class="msg info">게시를 요청했어요. 보통 1분 안팎 걸리고, 끝나면 자동으로 바뀝니다.</p><button type="button" class="btn wide" data-act="redispatch"' + (busy ? ' disabled' : '') + '>게시 실행 다시 요청</button>';
+  } else if(d.status === 'publishing'){
+    actions = '<p class="msg info">지금 스레드에 올리는 중이에요.</p>';
+  } else if(d.status === 'published'){
+    actions = safeUrl(d.permalink) ? '<a class="btn wide" href="' + esc(safeUrl(d.permalink)) + '" target="_blank" rel="noopener noreferrer">스레드에서 보기</a>' : '';
+  } else if(d.status === 'dismissed'){
+    actions = '<button type="button" class="btn wide" data-act="restore"' + (busy ? ' disabled' : '') + '>다시 검토하기</button>';
+  }
+  return '<div class="stack">'
+    + (d.published_ids.length && d.status !== 'published' ? '<p class="msg warn">이미 ' + d.published_ids.length + '개가 스레드에 올라갔어요. 이어서 게시하면 남은 글만 올리고, 올라간 내용 보호를 위해 수정은 잠겨요.</p>' : '')
+    + parts
+    + (can && e.parts.length < MAX_PARTS ? '<button type="button" class="btn small wide ghost" data-act="add-part">글 추가</button>' : '')
+    + '<div class="part"><div class="lbl">블로그 링크 위치</div><div class="choice">' + radio('reply','마지막 댓글에') + radio('body','첫 게시물에') + '</div></div>'
+    + '<div data-link-wrap' + (e.link_placement === 'reply' ? '' : ' hidden') + '><div class="part-top"><label class="part-label" for="lt-' + esc(d.id) + '">링크와 함께 달 문구</label>' + countHTML(e.link_text) + '</div><input type="text" id="lt-' + esc(d.id) + '" data-field="link" value="' + esc(e.link_text) + '"' + off + '></div>'
+    + (note ? '<p class="msg ' + esc(note.kind) + '" role="status">' + esc(note.text) + '</p>' : '')
+    + actions + '</div>';
+}
+function showSetup(open){
+  const c = S.cfg;
+  $('#setup').hidden = !open; $('#board').hidden = open; $('#tabs').hidden = open || !validCfg(c); $('#topActions').hidden = open || !validCfg(c);
+  $('#setupClose').hidden = !validCfg(c); $('#clearSetup').hidden = !validCfg(c);
+  if(open){
+    if(c){ $('#ownerInput').value = c.owner; $('#repoInput').value = c.repo; }
+    $('#tokenInput').value = '';
+    $('#tokenInput').placeholder = validCfg(c) ? '저장된 토큰 유지 (바꾸려면 새로 입력)' : 'github_pat_...';
+    setMsg('#setupMsg', '');
+  }
+}
+
+/* ---------- 동작 ---------- */
+function note(id, text, kind){ if(text) S.notes.set(id, {text, kind}); else S.notes.delete(id); }
+async function withBusy(id, fn){
+  if(S.busy.has(id)) return;
+  S.busy.add(id); note(id, ''); render();
+  try{ await fn(); }
+  catch(e){ note(id, e.message, 'err'); }
+  S.busy.delete(id);
+  render();
+}
+async function save(d){
+  const bad = problems(d);
+  if(bad.length){ note(d.id, bad[0], 'err'); render(); return; }
+  await withBusy(d.id, async () => {
+    await putDraft(d, editedFields(d));
+    S.edits.delete(d.id);
+    note(d.id, '저장했어요.', 'ok');
+  });
+}
+async function publish(d){
+  const bad = problems(d);
+  if(bad.length){ note(d.id, bad[0], 'err'); render(); return; }
+  if(!window.confirm('이 글을 스레드에 실제로 게시할까요?')) return;
+  await withBusy(d.id, async () => {
+    await putDraft(d, Object.assign(editedFields(d), { status:'queued', error:'' }));
+    S.edits.delete(d.id);
+    await dispatchPublish();
+  });
+  S.pollCount = 0; schedulePoll();
+}
+async function setStatus(d, status){
+  await withBusy(d.id, async () => { await putDraft(d, Object.assign(editedFields(d), { status })); S.edits.delete(d.id); });
+  if(status === 'dismissed' && S.open === d.id){ S.open = null; render(); }
+}
+async function submitSetup(ev){
+  ev.preventDefault();
+  const owner = $('#ownerInput').value.trim(), repo = $('#repoInput').value.trim();
+  const token = $('#tokenInput').value.trim() || (S.cfg && S.cfg.token) || '';
+  if(!owner || !repo || !token){ setMsg('#setupMsg', '세 칸을 모두 입력해 주세요.', 'err'); return; }
+  const cfg = { owner, repo, token };
+  $('#setupSave').disabled = true;
+  setMsg('#setupMsg', '연결을 확인하고 있어요.', 'info');
+  try{
+    const res = await gh(repoPath(cfg), { cfg });
+    if(!res.ok) throw new Error(await errText(res));
+    S.cfg = cfg; lsSet(KEY, cfg);
+    showSetup(false);
+    await loadAll();
+  }catch(e){ setMsg('#setupMsg', e.message, 'err'); }
+  $('#setupSave').disabled = false;
+}
+
+document.addEventListener('click', ev => {
+  const tab = ev.target.closest('[data-tab]');
+  if(tab){ S.tab = tab.dataset.tab; render(); return; }
+  const btn = ev.target.closest('[data-act]');
+  if(!btn) return;
+  const act = btn.dataset.act;
+  if(act === 'refresh'){ S.pollCount = 0; loadAll(); return; }
+  if(act === 'open-setup'){ showSetup(true); return; }
+  if(act === 'close-setup'){ showSetup(false); return; }
+  if(act === 'clear-setup'){
+    if(window.confirm('이 기기에서 GitHub 연결 정보를 지울까요?')){ lsDel(KEY); S.cfg = null; S.drafts = new Map(); S.edits = new Map(); clearTimeout(S.pollTimer); $('#ownerInput').value = ''; showSetup(true); }
+    return;
+  }
+  const card = btn.closest('[data-id]');
+  const d = card && S.drafts.get(card.dataset.id);
+  if(!d) return;
+  if(act === 'toggle'){ S.open = S.open === d.id ? null : d.id; render(); return; }
+  if(act === 'save') save(d);
+  else if(act === 'publish') publish(d);
+  else if(act === 'dismiss'){ if(window.confirm('이 초안을 버릴까요? 완료 탭에서 되돌릴 수 있어요.')) setStatus(d, 'dismissed'); }
+  else if(act === 'restore') setStatus(d, 'pending');
+  else if(act === 'redispatch') withBusy(d.id, async () => { await dispatchPublish(); note(d.id, '게시 실행을 다시 요청했어요.', 'ok'); S.pollCount = 0; schedulePoll(); });
+  else if(act === 'add-part'){ const e = editOf(d); if(e.parts.length < MAX_PARTS){ e.parts.push(''); e.dirty = true; render(); } }
+  else if(act === 'remove-part'){ const e = editOf(d); if(e.parts.length > 1){ e.parts.splice(Number(btn.dataset.i), 1); e.dirty = true; render(); } }
+});
+
+document.addEventListener('input', ev => {
+  const el = ev.target, field = el.dataset && el.dataset.field;
+  if(!field) return;
+  const card = el.closest('[data-id]');
+  const d = card && S.drafts.get(card.dataset.id);
+  if(!d) return;
+  const e = editOf(d);
+  e.dirty = true;
+  if(field === 'part'){
+    e.parts[Number(el.dataset.i)] = el.value;
+    el.closest('.part').querySelector('.count').outerHTML = countHTML(el.value);
+  } else if(field === 'link'){
+    e.link_text = el.value;
+    el.parentElement.querySelector('.count').outerHTML = countHTML(el.value);
+  } else if(field === 'placement'){
+    e.link_placement = el.value;
+    card.querySelector('[data-link-wrap]').hidden = el.value !== 'reply';
+  }
+});
+
+$('#setupForm').addEventListener('submit', submitSetup);
+
+const saved = lsGet(KEY);
+if(validCfg(saved)){ S.cfg = saved; showSetup(false); loadAll(); }
+else showSetup(true);
+})();
+</script>
+</body>
+</html>
