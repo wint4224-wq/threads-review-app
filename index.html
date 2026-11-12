@@ -20,13 +20,13 @@
 :root{
   --bg:#f4f4f1; --surface:#ffffff; --surface2:#ebebe6; --text:#1c1d1f; --muted:#65676b;
   --line:#dcdcd6; --accent:#2b4fd8; --accent-text:#ffffff; --accent-soft:#e2e8fc;
-  --danger:#b3261e; --danger-soft:#fbe4e1; --ok:#1c7a4e; --ok-soft:#dff2e8; --warn-soft:#fbf0d3;
+  --danger:#b3261e; --danger-soft:#fbe4e1; --ok:#1c7a4e; --ok-soft:#dff2e8; --warn-soft:#fbf0d3; --warn-ink:#8a5a00;
 }
 @media (prefers-color-scheme: dark){
   :root{
     --bg:#121314; --surface:#1b1d1f; --surface2:#26292c; --text:#ececea; --muted:#a2a5aa;
     --line:#33373b; --accent:#8fa8ff; --accent-text:#10162c; --accent-soft:#232d50;
-    --danger:#ff8f86; --danger-soft:#3b2120; --ok:#74d3a4; --ok-soft:#1b3328; --warn-soft:#3a3118;
+    --danger:#ff8f86; --danger-soft:#3b2120; --ok:#74d3a4; --ok-soft:#1b3328; --warn-soft:#3a3118; --warn-ink:#f0c46a;
   }
 }
 *{box-sizing:border-box}
@@ -85,6 +85,8 @@ main{max-width:760px;margin:0 auto;padding:16px 16px calc(40px + env(safe-area-i
 .part-label{font-weight:700;font-size:.92rem;flex:1}
 .count{font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums}
 .count.over{color:var(--danger);font-weight:700}
+.count.long{color:var(--warn-ink);font-weight:700}
+.preview-reply{white-space:pre-line;word-break:break-all;background:var(--surface2);border-radius:10px;padding:8px 12px;margin-top:8px}
 label.lbl{display:block;font-weight:600;margin-bottom:6px}
 input[type=text],input[type=password],input[type=url],textarea{width:100%;max-width:100%;border:1px solid var(--line);border-radius:12px;background:var(--bg);padding:12px 14px;font-size:1rem;min-height:48px}
 textarea{min-height:150px;resize:vertical;line-height:1.65}
@@ -175,7 +177,8 @@ textarea:disabled,input:disabled{opacity:.7}
 const $ = (s) => document.querySelector(s);
 const API = 'https://api.github.com';
 const KEY = 'threads-review.cfg';
-const MAX = 500, MAX_PARTS = 5, POLL_MS = 15000, POLL_LIMIT = 24;
+// MAX는 스레드 게시물 한도, POST/LINK는 초안 목표 길이(넘으면 경고만 하고 게시는 막지 않음)
+const MAX = 500, POST = 200, LINK = 60, MAX_PARTS = 5, POLL_MS = 15000, POLL_LIMIT = 24;
 const LABEL = { pending:'검토 대기', queued:'게시 대기', publishing:'게시 중', published:'게시 완료', failed:'게시 실패', dismissed:'버림' };
 const REVIEW = new Set(['pending','queued','publishing','failed']);
 const LOCKED = new Set(['queued','publishing','published','dismissed']);
@@ -243,6 +246,7 @@ function normalize(o, name, sha){
     post_url:s(o.post_url), published_at:s(o.published_at), body_source:s(o.body_source), status: LABEL[o.status] ? o.status : 'pending',
     parts:Array.isArray(o.parts) ? o.parts.map(s) : [], link_text:s(o.link_text), link_placement:o.link_placement === 'body' ? 'body' : 'reply',
     published_ids:Array.isArray(o.published_ids) ? o.published_ids : [], permalink:s(o.permalink), error:s(o.error), updated_at:s(o.updated_at),
+    main_keyword:s(o.main_keyword), related_keywords:Array.isArray(o.related_keywords) ? o.related_keywords.map(s).filter(Boolean) : [],
   };
 }
 async function loadFile(f){
@@ -345,8 +349,15 @@ function problems(d){
     if(threadLen(p.trim()) > MAX) out.push((i+1) + '번째 글이 ' + MAX + '자를 넘어요.');
   });
   if(e.link_placement === 'reply' && !e.link_text.trim()) out.push('링크 문구가 비어 있어요.');
-  if(threadLen(e.link_text.trim()) > MAX) out.push('링크 문구가 ' + MAX + '자를 넘어요.');
+  // 게시할 때 '→ 블로그 주소' 줄이 붙으므로 그 길이까지 합쳐 한도를 확인한다
+  const tail = '\n→ ' + d.post_url;
+  if(e.link_placement === 'reply' && threadLen(e.link_text.trim() + tail) > MAX) out.push('링크 문구와 주소를 합치면 ' + MAX + '자를 넘어요.');
+  if(e.link_placement === 'body' && e.parts[0] && threadLen(e.parts[0].trim() + tail) > MAX) out.push('첫 게시물과 주소를 합치면 ' + MAX + '자를 넘어요.');
   return out;
+}
+function linkPreview(d, e){
+  const url = '→ ' + d.post_url;
+  return e.link_placement === 'reply' ? '첫 댓글로 올라갈 모양\n' + (e.link_text.trim() || '(문구 없음)') + '\n' + url : '첫 게시물 마지막 줄에 붙는 모양\n' + url;
 }
 async function dispatch(mode){
   const res = await gh(repoPath() + '/actions/workflows/threads.yml/dispatches', { method:'POST', body:{ ref:'main', inputs:{ mode } } });
@@ -491,11 +502,16 @@ function cardHTML(d){
     + (open ? editorHTML(d) : '')
     + '</article>';
 }
-function countHTML(text){ const n = threadLen(text); return '<span class="count' + (n > MAX ? ' over' : '') + '">' + n + ' / ' + MAX + '</span>'; }
+function countHTML(text, target){
+  const n = threadLen(text);
+  const cls = n > MAX ? ' over' : (n > target ? ' long' : '');
+  const tip = n > MAX ? '게시 한도 ' + MAX + '자를 넘었어요' : (n > target ? '권장 ' + target + '자를 넘었어요' : '');
+  return '<span class="count' + cls + '"' + (tip ? ' title="' + tip + '"' : '') + '>' + n + ' / ' + target + '</span>';
+}
 function editorHTML(d){
   const e = editOf(d), can = isEditable(d), off = can ? '' : ' disabled', busy = S.busy.has(d.id);
   const parts = e.parts.map((p,i) => '<div class="part">'
-    + '<div class="part-top"><span class="part-label">' + (i === 0 ? '첫 게시물' : (i+1) + '번째 (댓글로 이어짐)') + '</span>' + countHTML(p)
+    + '<div class="part-top"><span class="part-label">' + (i === 0 ? '첫 게시물' : (i+1) + '번째 (댓글로 이어짐)') + '</span>' + countHTML(p, POST)
     + (can && e.parts.length > 1 ? '<button type="button" class="btn small ghost" data-act="remove-part" data-i="' + i + '" aria-label="' + (i+1) + '번째 글 삭제">삭제</button>' : '')
     + '</div><textarea data-field="part" data-i="' + i + '" aria-label="' + (i+1) + '번째 글"' + off + '>' + esc(p) + '</textarea></div>').join('');
   const radio = (v,t) => '<label><input type="radio" name="link-' + esc(d.id) + '" value="' + v + '" data-field="placement"' + (e.link_placement === v ? ' checked' : '') + off + '>' + t + '</label>';
@@ -516,12 +532,14 @@ function editorHTML(d){
   } else if(d.status === 'dismissed'){
     actions = '<button type="button" class="btn wide" data-act="restore"' + (busy ? ' disabled' : '') + '>다시 검토하기</button>';
   }
-  return '<div class="stack">'
+  const kw = d.main_keyword ? '<p class="sub" data-keywords>메인키워드 <b>' + esc(d.main_keyword) + '</b>' + (d.related_keywords.length ? ' · 연관키워드 ' + esc(d.related_keywords.join(', ')) : '') + '</p>' : '';
+  return '<div class="stack">' + kw
     + (d.published_ids.length && d.status !== 'published' ? '<p class="msg warn">이미 ' + d.published_ids.length + '개가 스레드에 올라갔어요. 이어서 게시하면 남은 글만 올리고, 올라간 내용 보호를 위해 수정은 잠겨요.</p>' : '')
     + parts
     + (can && e.parts.length < MAX_PARTS ? '<button type="button" class="btn small wide ghost" data-act="add-part">글 추가</button>' : '')
-    + '<div class="part"><div class="lbl">블로그 링크 위치</div><div class="choice">' + radio('reply','마지막 댓글에') + radio('body','첫 게시물에') + '</div></div>'
-    + '<div data-link-wrap' + (e.link_placement === 'reply' ? '' : ' hidden') + '><div class="part-top"><label class="part-label" for="lt-' + esc(d.id) + '">링크와 함께 달 문구</label>' + countHTML(e.link_text) + '</div><input type="text" id="lt-' + esc(d.id) + '" data-field="link" value="' + esc(e.link_text) + '"' + off + '></div>'
+    + '<div class="part"><div class="lbl">블로그 링크 위치</div><div class="choice">' + radio('reply','첫 댓글에') + radio('body','본문 끝에') + '</div></div>'
+    + '<div data-link-wrap' + (e.link_placement === 'reply' ? '' : ' hidden') + '><div class="part-top"><label class="part-label" for="lt-' + esc(d.id) + '">댓글에 달 문구</label>' + countHTML(e.link_text, LINK) + '</div><input type="text" id="lt-' + esc(d.id) + '" data-field="link" value="' + esc(e.link_text) + '"' + off + '></div>'
+    + '<p class="sub preview-reply" data-link-preview>' + esc(linkPreview(d, e)) + '</p>'
     + (note ? '<p class="msg ' + esc(note.kind) + '" role="status">' + esc(note.text) + '</p>' : '')
     + actions + '</div>';
 }
@@ -634,14 +652,16 @@ document.addEventListener('input', ev => {
   e.dirty = true;
   if(field === 'part'){
     e.parts[Number(el.dataset.i)] = el.value;
-    el.closest('.part').querySelector('.count').outerHTML = countHTML(el.value);
+    el.closest('.part').querySelector('.count').outerHTML = countHTML(el.value, POST);
   } else if(field === 'link'){
     e.link_text = el.value;
-    el.parentElement.querySelector('.count').outerHTML = countHTML(el.value);
+    el.parentElement.querySelector('.count').outerHTML = countHTML(el.value, LINK);
   } else if(field === 'placement'){
     e.link_placement = el.value;
     card.querySelector('[data-link-wrap]').hidden = el.value !== 'reply';
   }
+  const pv = card.querySelector('[data-link-preview]');
+  if(pv) pv.textContent = linkPreview(d, e);
 });
 
 $('#setupForm').addEventListener('submit', submitSetup);
