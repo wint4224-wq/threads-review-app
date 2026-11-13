@@ -201,6 +201,12 @@ function threadLen(s){
   }
   return n;
 }
+// 200자 목표는 눈에 보이는 글자 수로 센다 (이모지·기호도 1자)
+function visibleLen(s){
+  let n = 0;
+  for(const ch of String(s)){ const c = ch.codePointAt(0); if(c !== 0xFE0F && c !== 0x200D) n++; }
+  return n;
+}
 
 const S = { cfg:null, tab:'review', drafts:new Map(), edits:new Map(), open:null, token:null, loading:false, busy:new Set(), notes:new Map(), pollCount:0, pollTimer:null,
   reqs:new Map(), watchUntil:0, shared:'' };
@@ -503,9 +509,9 @@ function cardHTML(d){
     + '</article>';
 }
 function countHTML(text, target){
-  const n = threadLen(text);
-  const cls = n > MAX ? ' over' : (n > target ? ' long' : '');
-  const tip = n > MAX ? '게시 한도 ' + MAX + '자를 넘었어요' : (n > target ? '권장 ' + target + '자를 넘었어요' : '');
+  const n = visibleLen(text), over = threadLen(text) > MAX;
+  const cls = over ? ' over' : (n > target ? ' long' : '');
+  const tip = over ? '게시 한도 ' + MAX + '자를 넘었어요' : (n > target ? '권장 ' + target + '자를 넘었어요' : '');
   return '<span class="count' + cls + '"' + (tip ? ' title="' + tip + '"' : '') + '>' + n + ' / ' + target + '</span>';
 }
 function editorHTML(d){
