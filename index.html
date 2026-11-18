@@ -178,7 +178,7 @@ const $ = (s) => document.querySelector(s);
 const API = 'https://api.github.com';
 const KEY = 'threads-review.cfg';
 // MAX는 스레드 게시물 한도, POST/LINK는 초안 목표 길이(넘으면 경고만 하고 게시는 막지 않음)
-const MAX = 500, POST = 200, LINK = 60, MAX_PARTS = 5, POLL_MS = 15000, POLL_LIMIT = 24;
+const MAX = 500, POST = 250, LINK = 60, MAX_PARTS = 5, POLL_MS = 15000, POLL_LIMIT = 24;
 const LABEL = { pending:'검토 대기', queued:'게시 대기', publishing:'게시 중', published:'게시 완료', failed:'게시 실패', dismissed:'버림' };
 const REVIEW = new Set(['pending','queued','publishing','failed']);
 const LOCKED = new Set(['queued','publishing','published','dismissed']);
@@ -201,10 +201,10 @@ function threadLen(s){
   }
   return n;
 }
-// 200자 목표는 눈에 보이는 글자 수로 센다 (이모지·기호도 1자)
+// 본문 목표 길이는 눈에 보이는 글자 수로 센다 (이모지·기호도 1자, 줄바꿈은 세지 않음)
 function visibleLen(s){
   let n = 0;
-  for(const ch of String(s)){ const c = ch.codePointAt(0); if(c !== 0xFE0F && c !== 0x200D) n++; }
+  for(const ch of String(s)){ const c = ch.codePointAt(0); if(c !== 0xFE0F && c !== 0x200D && c !== 10 && c !== 13) n++; }
   return n;
 }
 
